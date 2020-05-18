@@ -92,11 +92,14 @@ class BasicDistiller(AbstractDistiller):
             global_step = 0
             writer_step = 0
             for step, batch in tqdm(enumerate(cycle(dataloader)),disable=None):
+
+
                 if batch_postprocessor is not None:
                     batch = batch_postprocessor(batch)
                 total_loss = self.train_on_batch(batch,args)
                 total_loss /= self.t_config.gradient_accumulation_steps
                 total_loss.backward()
+
 
                 self.write_loss(total_loss, writer_step)
                 writer_step += 1
@@ -104,7 +107,9 @@ class BasicDistiller(AbstractDistiller):
                 if (step+1)%self.t_config.gradient_accumulation_steps == 0:
                     if max_grad_norm > 0:
                         torch.nn.utils.clip_grad_norm_(self.model_S.parameters(), max_grad_norm)
+
                     optimizer.step()
+
                     if scheduler is not None:
                         scheduler.step()
                     optimizer.zero_grad()
@@ -130,7 +135,7 @@ class BasicDistiller(AbstractDistiller):
         if print_every == 0:
             print_every = train_steps_per_epoch
         checkpoints = [int(train_steps_per_epoch*ci/self.t_config.ckpt_frequency) for ci in range(self.t_config.ckpt_frequency)]
-        logger.info(f"Training steps per epoch: {train_steps_per_epoch}")
+        logger.info(f"Training steps per epoch: {train_steps_per_epoch}, Num Epochs: {num_epochs}")
         logger.info(f"Checkpoints(step): {checkpoints}")
 
         global_step = 0
@@ -162,6 +167,7 @@ class BasicDistiller(AbstractDistiller):
                     if max_grad_norm > 0:
                         torch.nn.utils.clip_grad_norm_(self.model_S.parameters(), max_grad_norm)
                     optimizer.step()
+
                     if scheduler is not None:
                         scheduler.step()
                     optimizer.zero_grad()
@@ -181,8 +187,9 @@ class BasicDistiller(AbstractDistiller):
                         self.save_and_callback(global_step, step, current_epoch, callback)
 
             logger.info(f"Epoch {current_epoch+1} finished")
+        return total_loss.item()
 
-    def train_on_batch(self, batch, args):
+    def train_on_batch(self, batch, args) -> torch.FloatTensor:
         if self.d_config.is_caching_logits is False:
             if type(batch) is dict:
                 for k,v in batch.items():
